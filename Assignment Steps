@@ -1,0 +1,143 @@
+Step 1 - Set Up Your Kubernetes Cluster ( Azure , aws , GCP you can use any clusters )
+Step 2 - Install Helm on your local machine and initialize it on your Kubernetes cluster. Its used to package manger in kubernetes. 
+         # Install Helm
+            curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+
+        # Initialize Helm on your Kubernetes cluster
+            helm init
+Step 3 - Navigate to the directory where you want to create your Helm chart and run.
+          helm create my-elk-chart
+          cd my-elk-chart
+Step 4 - Edit the values.yaml file in your Helm chart directory to configure Elasticsearch and Kibana settings.
+         # values.yaml
+
+          elasticsearch:
+            enabled: true
+            image: docker.elastic.co/elasticsearch/elasticsearch:7.10.0
+            replicas: 1
+          
+          kibana:
+            enabled: true
+            image: docker.elastic.co/kibana/kibana:7.10.0
+            replicas: 1
+Step 5 - Inside your Helm chart directory (my-elk-chart), update or create the necessary Kubernetes manifest files 
+         for Elasticsearch and Kibana in the templates folder.
+         
+         Elasticsearch Deployment (templates/elasticsearch.yaml).
+
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: {{ template "my-elk-chart.fullname" . }}
+          spec:
+            replicas: {{ .Values.elasticsearch.replicas }}
+            selector:
+              matchLabels:
+                app: {{ template "my-elk-chart.name" . }}
+                release: {{ .Release.Name }}
+            template:
+              metadata:
+                labels:
+                  app: {{ template "my-elk-chart.name" . }}
+                  release: {{ .Release.Name }}
+              spec:
+                containers:
+                  - name: elasticsearch
+                    image: {{ .Values.elasticsearch.image }}
+                    ports:
+                      - containerPort: 9200
+
+         Kibana Deployment (templates/kibana.yaml)
+
+                apiVersion: apps/v1
+                kind: Deployment
+                metadata:
+                  name: {{ template "my-elk-chart.fullname" . }}
+                spec:
+                  replicas: {{ .Values.kibana.replicas }}
+                  selector:
+                    matchLabels:
+                      app: {{ template "my-elk-chart.name" . }}
+                      release: {{ .Release.Name }}
+                  template:
+                    metadata:
+                      labels:
+                        app: {{ template "my-elk-chart.name" . }}
+                        release: {{ .Release.Name }}
+                    spec:
+                      containers:
+                        - name: kibana
+                          image: {{ .Values.kibana.image }}
+                          ports:
+                            - containerPort: 5601
+
+Step 6 - Create Services
+         Add service manifests for Elasticsearch and Kibana in the templates folder.
+         
+         Elasticsearch Service (templates/elasticsearch-service.yaml)
+
+         apiVersion: v1
+          kind: Service
+          metadata:
+            name: {{ template "my-elk-chart.fullname" . }}-elasticsearch
+          spec:
+            selector:
+              app: {{ template "my-elk-chart.name" . }}
+              release: {{ .Release.Name }}
+            ports:
+              - protocol: TCP
+                port: 9200
+                targetPort: 9200
+ 
+          Kibana Service (templates/kibana-service.yaml)
+
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: {{ template "my-elk-chart.fullname" . }}-kibana
+          spec:
+            selector:
+              app: {{ template "my-elk-chart.name" . }}
+              release: {{ .Release.Name }}
+            ports:
+              - protocol: TCP
+                port: 5601
+                targetPort: 5601
+
+Step 7 -  Configure File Repository and Automated Backups.Add a Job manifest for Elasticsearch backups in the
+          templates folder.
+
+         Elasticsearch Backup Job (templates/elasticsearch-backup-job.yaml)
+
+         apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: {{ template "my-elk-chart.fullname" . }}-elasticsearch-backup
+            spec:
+              template:
+                spec:
+                  containers:
+                  - name: elasticsearch-backup
+                    image: YOUR_BACKUP_IMAGE:TAG
+                    env:
+                    - name: ELASTICSEARCH_URL
+                      value: "http://{{ template "my-elk-chart.fullname" . }}-elasticsearch:9200"
+                    - name: BACKUP_PATH
+                      value: "/backup"
+                  restartPolicy: OnFailure
+
+Step 8 - Install Helm Chart.Navigate back to your Helm chart directory and install the chart.
+
+        helm install my-elk-release 
+
+Step 9 -  Commit to GitHub
+          Commit your entire Helm chart directory to a new GitHub repository
+
+            git init
+            git add .
+            git commit -m "Initial commit"
+            git remote add origin <your-github-repo-url>
+            git push -u origin master
+
+
+          
